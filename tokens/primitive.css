@@ -1,0 +1,95 @@
+/* =========================================================
+   Primitive tokens — 원본 값만 정의한다. 화면 코드에서 직접 참조 금지.
+   출처: Hyundai CI Color (hyundai.com/kr/ko/info/ci/ci-color)
+   ● = CI 원본, 나머지는 UI용 파생 값 (DESIGN_GUIDE.md §1)
+   ========================================================= */
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css");
+
+:root {
+  /* CI 9색 */
+  --ci-blue: #002C5F;
+  --ci-sand: #E4DCD3;
+  --ci-light-sand: #F6F3F2;
+  --ci-gold: #A36B4F;
+  --ci-white: #FFFFFF;
+  --ci-black: #000000;
+  --ci-active-blue: #00AAD2;
+  --ci-sky-blue: #AACAE6;
+  --ci-active-red: #E63312;
+
+  /* Blue */
+  --blue-50: #EEF2F7;
+  --blue-100: #D6E0EC;
+  --blue-200: var(--ci-sky-blue);   /* ● */
+  --blue-300: #6F94BF;
+  --blue-500: #1F4E86;
+  --blue-700: var(--ci-blue);       /* ● */
+  --blue-900: #001B3B;
+
+  /* Sand / Neutral */
+  --sand-0: var(--ci-white);        /* ● */
+  --sand-50: var(--ci-light-sand);  /* ● */
+  --sand-100: #EEE8E3;
+  --sand-200: var(--ci-sand);       /* ● */
+  --sand-300: #CFC5BA;
+  --sand-500: #9A928A;              /* 텍스트 금지 */
+  --sand-600: #6E6863;
+  --sand-700: #4A4744;
+  --sand-900: #1C1B1A;
+
+  /* Accent */
+  --active-50: #E0F5FA;
+  --active-500: var(--ci-active-blue); /* ● 텍스트 금지 */
+  --active-ink: #00799A;
+  --active-deep: #00566E;
+  --gold-500: var(--ci-gold);          /* ● 24px 이상 텍스트만 */
+  --gold-ink: #8A5740;
+  --red-ink: #C02A0E;
+
+  /* Type */
+  --font-sans: 'Pretendard Variable', Pretendard, -apple-system, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Consolas, monospace;
+
+  --fs-display: clamp(2.5rem, 1.5rem + 4.444vw, 5.5rem);
+  --fs-h1: clamp(2rem, 1.5rem + 2.222vw, 3.5rem);
+  --fs-h2: clamp(1.5rem, 1.167rem + 1.481vw, 2.5rem);
+  --fs-h3: clamp(1.25rem, 1.167rem + 0.370vw, 1.5rem);
+  --fs-body-l: clamp(1.0625rem, 1.042rem + 0.093vw, 1.125rem);
+  --fs-body: 1rem;
+  --fs-caption: 0.875rem;
+  --fs-overline: 0.75rem;
+
+  /* Spacing (4px base) */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --sp-12: 48px;
+  --sp-16: 64px;
+  --sp-24: 96px;
+  --sp-32: 128px;
+  --sp-section: clamp(56px, 2.5rem + 3vw, 104px);
+
+  /* Radius */
+  --r-0: 0;
+  --r-sm: 4px;
+  --r-md: 8px;
+  --r-full: 999px;
+
+  /* Motion */
+  --dur-fast: 150ms;
+  --dur-base: 240ms;
+  --dur-slow: 600ms;
+  --ease-out: cubic-bezier(.2, .7, .2, 1);
+  --ease-in-out: cubic-bezier(.65, 0, .35, 1);
+
+  /* Layout */
+  --container: 1200px;
+  --gnb-h: 56px;
+}
+
+@media (min-width: 768px) {
+  :root { --gnb-h: 64px; }
+}

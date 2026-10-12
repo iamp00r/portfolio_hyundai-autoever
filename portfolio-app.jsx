@@ -1,542 +1,315 @@
-const { Badge, Button, Card } = window.DesignSystem_4f270c;
 const D = window.PF_DATA;
 
-const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
-  "mood": "warm",
-  "accent": "#0AA0D2",
-  "density": "regular",
-  "typeScale": 100,
-  "scrollAnim": true,
-  "showProposal": true,
-  "showPerspective": true,
-  "showAwards": true
-}/*EDITMODE-END*/;
-
-const MOODS = { warm: "Warm Minimal", night: "Night", paper: "Paper" };
-const ACCENT_SOFT = { "#0AA0D2": "#E2F4FA", "#0A3255": "#E4EAF0" };
-
-function useReveal(dep) {
+/* ---------- 01 Hero: 커서 반응 빛 (DESIGN_GUIDE.md §5-2) ---------- */
+function useCursorAura(ref) {
   React.useEffect(() => {
-    const els = document.querySelectorAll(".rv:not(.in)");
-    const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } }), { rootMargin: "0px 0px -12% 0px", threshold: 0.08 });
-    els.forEach((el) => io.observe(el));
-    return () => io.disconnect();
-  }, [dep]);
-}
+    const hero = ref.current;
+    if (!hero || reduceMotion()) return;
+    const HOME = { x: 62, y: 46 };
+    const fine = window.matchMedia("(pointer: fine)").matches;
+    let target = { ...HOME }, m = { ...HOME }, l = { ...HOME };
+    let raf = 0, visible = true, lastInput = 0, returnTimer = 0, t0 = performance.now();
+    const start = () => { if (!raf && visible) raf = requestAnimationFrame(tick); };
+    const lerp = (a, b, k) => a + (b - a) * k;
 
-function CountUp({ to, prefix = "", suffix = "", anim }) {
-  const [n, setN] = React.useState(anim ? 0 : to);
-  const ref = React.useRef(null);
-  React.useEffect(() => {
-    if (!anim) { setN(to); return; }
-    const el = ref.current; if (!el) return;
-    let raf, started = false;
-    const io = new IntersectionObserver((es) => es.forEach((e) => {
-      if (e.isIntersecting && !started) {
-        started = true;
-        const t0 = performance.now(), dur = 1200;
-        const tick = (t) => {
-          const p = Math.min(1, (t - t0) / dur), e2 = 1 - Math.pow(1 - p, 3);
-          setN(Math.round(to * e2));
-          if (p < 1) raf = requestAnimationFrame(tick);
-        };
-        raf = requestAnimationFrame(tick);
+    const setTarget = (cx, cy) => {
+      const r = hero.getBoundingClientRect();
+      target = { x: ((cx - r.left) / r.width) * 100, y: ((cy - r.top) / r.height) * 100 };
+      lastInput = performance.now();
+      clearTimeout(returnTimer);
+      start();
+    };
+    const goHome = (delay) => { clearTimeout(returnTimer); returnTimer = setTimeout(() => { target = { ...HOME }; start(); }, delay); };
+    const onMove = (e) => setTarget(e.clientX, e.clientY);
+    const onLeave = () => goHome(0);
+    const onTouch = (e) => { const t = e.touches[0]; if (t) { setTarget(t.clientX, t.clientY); goHome(1200); } };
+
+    const tick = (now) => {
+      raf = 0;
+      if (!visible) return;
+      // 터치 기기: 입력이 없으면 12초 주기로 천천히 떠다님
+      if (!fine && now - lastInput > 2400) {
+        const p = ((now - t0) / 12000) * Math.PI * 2;
+        target = { x: HOME.x + Math.cos(p) * 14, y: HOME.y + Math.sin(p * 2) * 10 };
       }
-    }), { threshold: 0.4 });
-    io.observe(el);
-    return () => { io.disconnect(); cancelAnimationFrame(raf); };
-  }, [to, anim]);
-  return <span ref={ref}>{prefix}{n.toLocaleString("ko-KR")}<small>{suffix}</small></span>;
-}
-
-// 카드 위 커서 스포트라이트 + 살짝 기울기 (.spot 요소에 위임)
-function useSpotlight(on) {
-  React.useEffect(() => {
-    if (!on || !matchMedia("(hover: hover) and (pointer: fine)").matches || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    let cur = null;
-    const reset = () => { if (cur) cur.style.rotate = ""; cur = null; };
-    const move = (e) => {
-      const el = e.target.closest && e.target.closest(".spot");
-      if (el !== cur) reset();
-      if (!el) return;
-      cur = el;
-      const r = el.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
-      el.style.setProperty("--mx", x + "px");
-      el.style.setProperty("--my", y + "px");
-      const dx = x / r.width - 0.5, dy = y / r.height - 0.5, mag = Math.hypot(dx, dy);
-      el.style.rotate = mag ? `${-dy} ${dx} 0 ${(mag * 7).toFixed(2)}deg` : "";
+      m = { x: lerp(m.x, target.x, fine ? 0.35 : 0.08), y: lerp(m.y, target.y, fine ? 0.35 : 0.08) };
+      l = { x: lerp(l.x, target.x, 0.06), y: lerp(l.y, target.y, 0.06) };
+      hero.style.setProperty("--mx", m.x.toFixed(2) + "%");
+      hero.style.setProperty("--my", m.y.toFixed(2) + "%");
+      hero.style.setProperty("--lx", l.x.toFixed(2) + "%");
+      hero.style.setProperty("--ly", l.y.toFixed(2) + "%");
+      // 마우스 기기는 빛이 목표에 도달하면 루프를 멈추고, 다음 입력 때 다시 시작
+      const settled = fine && Math.abs(l.x - target.x) + Math.abs(l.y - target.y) + Math.abs(m.x - target.x) + Math.abs(m.y - target.y) < 0.05;
+      if (!settled) raf = requestAnimationFrame(tick);
     };
-    document.addEventListener("pointermove", move, { passive: true });
-    document.documentElement.addEventListener("mouseleave", reset);
-    return () => { reset(); document.removeEventListener("pointermove", move); document.documentElement.removeEventListener("mouseleave", reset); };
-  }, [on]);
-}
 
-// ↑↑↓↓←→←→BA — 한글 입력 상태에서도 동작하도록 e.code로 비교
-const KONAMI = ["ArrowUp", "ArrowUp", "ArrowDown", "ArrowDown", "ArrowLeft", "ArrowRight", "ArrowLeft", "ArrowRight", "KeyB", "KeyA"];
-function useKonami(fire) {
-  React.useEffect(() => {
-    let i = 0;
-    const on = (e) => {
-      if (e.target.closest && e.target.closest("input, textarea, select, [contenteditable]")) return;
-      i = e.code === KONAMI[i] ? i + 1 : (e.code === KONAMI[0] ? 1 : 0);
-      if (i === KONAMI.length) { i = 0; fire(); }
+    // 히어로가 화면 밖이면 루프 정지 + 스크롤 비율만큼 빛을 흐리게
+    const io = new IntersectionObserver(([e]) => { visible = e.isIntersecting; if (visible) start(); });
+    io.observe(hero);
+    const onScroll = () => {
+      const h = hero.offsetHeight || 1;
+      hero.style.setProperty("--aura-o", Math.max(0, 1 - window.scrollY / h).toFixed(3));
     };
-    window.addEventListener("keydown", on);
-    return () => window.removeEventListener("keydown", on);
-  }, [fire]);
-}
 
-const CONFETTI_C = ["#0A3255", "#0AA0D2", "#B4E114", "#5CC2E4"];
-function Quest({ open, onClose }) {
-  const bits = React.useMemo(() => Array.from({ length: 56 }, (_, i) => ({
-    l: Math.random() * 100, d: Math.random() * 0.6, t: 2.2 + Math.random() * 1.6,
-    r: Math.random() * 720 - 360, x: Math.random() * 160 - 80, w: 6 + Math.random() * 8, c: CONFETTI_C[i % CONFETTI_C.length]
-  })), [open]);
-  React.useEffect(() => {
-    if (!open) return;
-    const esc = (e) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", esc);
-    return () => window.removeEventListener("keydown", esc);
-  }, [open, onClose]);
-  if (!open) return null;
-  return (
-    <div className="quest" role="dialog" aria-modal="true" aria-labelledby="quest-t" onClick={onClose}>
-      <div className="confetti" aria-hidden="true">
-        {bits.map((b, i) => <i key={i} style={{ left: b.l + "%", width: b.w, height: b.w * 0.6, background: b.c, animationDelay: b.d + "s", animationDuration: b.t + "s", "--r": b.r + "deg", "--x": b.x + "px" }}></i>)}
-      </div>
-      <div className="quest-card" onClick={(e) => e.stopPropagation()}>
-        <h3 id="quest-t">숨은 퀘스트를 찾아주셨군요!</h3>
-        <p className="quest-body">여기까지 살펴봐 주셔서 감사합니다. 작은 디테일까지 챙기는 저 <b>{D.name}</b>도 새로운 즐거움으로 통하는 문, 넥슨스페이스에 합류하고 싶습니다.</p>
-        <div className="quest-exp"><span>EXP</span><div><i></i></div><em>100%</em></div>
-        <div className="quest-cta">
-          <button className="btn btn-line" type="button" onClick={onClose} autoFocus>닫기</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// **강조** 문법을 <b>로 변환
-function R(text) {
-  if (typeof text !== "string") return text;
-  return text.split(/\*\*(.+?)\*\*/g).map((t, i) => (i % 2 ? <b key={i}>{t}</b> : t));
-}
-
-function SecHead({ label, title, lead, id }) {
-  return (
-    <div className="sec-head rv" id={id}>
-      <p className="eyebrow">{label}</p>
-      <h2 className="h2">{title}</h2>
-      {lead && <p className="lead">{R(lead)}</p>}
-    </div>
-  );
-}
-
-function Nav({ active }) {
-  const [stuck, setStuck] = React.useState(false);
-  React.useEffect(() => {
-    const on = () => setStuck(window.scrollY > 40);
-    on(); window.addEventListener("scroll", on, { passive: true });
-    return () => window.removeEventListener("scroll", on);
+    if (fine) {
+      hero.addEventListener("pointermove", onMove, { passive: true });
+      hero.addEventListener("pointerleave", onLeave);
+    } else {
+      hero.addEventListener("touchstart", onTouch, { passive: true });
+      hero.addEventListener("touchmove", onTouch, { passive: true });
+    }
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+    start();
+    return () => {
+      cancelAnimationFrame(raf); clearTimeout(returnTimer); io.disconnect();
+      hero.removeEventListener("pointermove", onMove); hero.removeEventListener("pointerleave", onLeave);
+      hero.removeEventListener("touchstart", onTouch); hero.removeEventListener("touchmove", onTouch);
+      window.removeEventListener("scroll", onScroll);
+    };
   }, []);
-  return (
-    <nav className={"nav" + (stuck ? " stuck" : "")}>
-      <a className="mark" href="#top">하지연<span> · </span>포트폴리오</a>
-      <div className="nav-links">
-        {D.nav.map((n) => <a key={n.id} href={"#" + n.id} className={active === n.id ? "on" : ""}>{n.label}</a>)}
-      </div>
-    </nav>
-  );
 }
 
 function Hero() {
+  const H = D.hero;
+  const ref = React.useRef(null);
+  useCursorAura(ref);
   return (
-    <header className="hero" id="top">
-      <div className="wrap hero-inner">
-        <div className="hero-name">
-          <b>{D.name}</b><em>{D.nameEn}</em>
-        </div>
-        <h1>
-          {D.headline.map((l, i) => {
-            const parts = D.accentWord && l.includes(D.accentWord) ? l.split(D.accentWord) : null;
-            return <span className="ln" key={i}><i>{parts ? <>{parts[0]}<span className="accentword">{D.accentWord}</span>{parts.slice(1).join(D.accentWord)}</> : l}</i></span>;
+    <section id="top" className="hero" ref={ref} aria-labelledby="hero-title">
+      <div className="container hero__inner">
+        <p className="hero__overline">
+          <span className="only-desktop">{H.overline}</span>
+          <span className="only-mobile">{H.overlineShort}</span>
+        </p>
+        <h1 id="hero-title" className="hero__title">
+          {H.headline.map((line, i) => {
+            const at = line.indexOf(H.accent);
+            if (at < 0) return <span key={i} className="hero__line">{line} </span>;
+            return (
+              <span key={i} className="hero__line">
+                {line.slice(0, at)}<span className="hero__accent">{H.accent}</span>{line.slice(at + H.accent.length)}{" "}
+              </span>
+            );
           })}
         </h1>
-        <p className="hero-body">{D.heroBody}</p>
-        <div className="hero-facts">
-          {D.quickFacts.map((f) => <span className="fact" key={f}>{f}</span>)}
+        <p className="hero__body">{H.body}</p>
+        <div className="hero__cta">
+          <Button href={H.cta.href} size="lg" icon="right">{H.cta.label}</Button>
         </div>
-        <div className="hero-cta">
-          {D.cta.map((c) => (
-            <a key={c.label} className={"btn " + (c.fill ? "btn-fill" : "btn-line")} href={c.href} target={c.href.startsWith("http") ? "_blank" : undefined} rel="noreferrer">{c.label}</a>
-          ))}
-        </div>
+        <ul className="hero__tags" aria-label="역량 키워드">
+          {H.tags.map((t) => <li key={t.t} className={`hashtag${t.ai ? " hashtag--ai" : ""}`}>{t.t}</li>)}
+        </ul>
+        <a className="hero__scroll only-mobile" href="#strength">{H.scrollHint} <ArrowIcon dir="down" /></a>
       </div>
-      <div className="wrap hero-foot">
-        <p className="eyebrow" style={{ margin: 0 }}>{D.eyebrow}</p>
-        <div className="scrollcue"><span className="bar"></span>Scroll</div>
-      </div>
-      <div className="hero-rule"></div>
-    </header>
+    </section>
   );
 }
 
-function Journey() {
-  const j = D.journey;
+/* ---------- 02 Strength ---------- */
+function Strength() {
+  const S = D.strength;
   return (
-    <section className="sec" id="journey">
-      <div className="wrap">
-        <div className="jr-top">
-          <SecHead label={j.label} title={j.title} lead={j.lead} />
-          <div className="jr-legend rv">
-            {j.legend.map((l) => <span key={l.k} className={"jr-lg t-" + l.k}><i></i>{l.v}</span>)}
-          </div>
-        </div>
-        <div className="jr">
-          {j.years.map((yr, i) => (
-            <div className={"jr-col rv" + (yr.next ? " next" : "")} key={yr.y} style={{ transitionDelay: i * 70 + "ms" }}>
-              <span className="jr-y">{yr.y}</span>
-              <span className="jr-dot"></span>
-              <ul>
-                {yr.items.map((it) => (
-                  <li key={it.name} className={"t-" + it.t}>
-                    <b>{it.name}</b>
-                    <span>{it.note}</span>
-                  </li>
-                ))}
+    <section id="strength" className="section section--sunken" aria-labelledby="strength-title">
+      <div className="container">
+        <SectionHeader no={S.no} label={S.label} title={<span id="strength-title">{S.title}</span>} lead={S.lead} />
+        <ol className="strength">
+          {S.items.map((it, i) => (
+            <li key={it.no} className="strength__card rv" style={{ "--i": i }}>
+              <p className="strength__no"><span>{it.no}</span> {it.en}</p>
+              <h3 className="strength__title">{it.title}</h3>
+              <p className="strength__body">{it.body}</p>
+              <ul className="strength__proof" aria-label="근거">
+                {it.proof.map((p) => <li key={p}>{p}</li>)}
               </ul>
-            </div>
+            </li>
           ))}
-        </div>
+        </ol>
       </div>
     </section>
   );
 }
 
-function About() {
-  const a = D.about;
+/* ---------- 03 Projects ---------- */
+function AiSplit({ ai, human }) {
+  const P = D.projects;
   return (
-    <section className="sec alt" id="about">
-      <div className="wrap">
-        <SecHead label={a.label} title={a.title} lead={a.lead} />
-        <div className="about-grid">
-          {a.items.map((it, i) => (
-            <div className="about-item spot rv" key={it.no} style={{ "--d": i * 90 + "ms" }}>
-              <span className="no">{it.no}</span>
-              <span className="tg">{it.tag}</span>
-              <h3 className="h3">{it.title}</h3>
-              <p className="body">{R(it.body)}</p>
-              {it.proof && <p className="proof">{it.proof}</p>}
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
+    <dl className="ai-split">
+      <div className="ai-split__row ai-split__row--ai"><dt>{P.aiLabel}</dt><dd>{ai}</dd></div>
+      <div className="ai-split__row"><dt>{P.humanLabel}</dt><dd>{human}</dd></div>
+    </dl>
   );
 }
 
-function Stats({ anim }) {
-  const s = D.stats;
+/* DIDIT는 캡처가 없어 레이아웃 구조를 도식으로 보여 준다 */
+function DiditDiagram() {
   return (
-    <section className="sec deep">
-      <div className="wrap">
-        <div className="sec-head rv" style={{ marginBottom: 0 }}>
-          <p className="eyebrow">{s.label}</p>
-          <h2 className="h2">{s.title}</h2>
+    <div className="didit-dia" role="img" aria-label="DIDIT 워크스페이스 레이아웃 구조도. 왼쪽 프로젝트·채널 사이드바와 오른쪽 채팅 패널은 고정되고, 가운데 영역만 라운지·회의실·회의록으로 바뀐다">
+      <div className="didit-dia__col didit-dia__col--rail"><span /><span /><span /></div>
+      <div className="didit-dia__col didit-dia__col--channels">
+        <b># 채널</b><i /><i /><i className="is-on" /><i />
+      </div>
+      <div className="didit-dia__main">
+        <div className="didit-dia__swap">
+          <em>라운지</em><em className="is-on">회의실</em><em>회의록</em>
         </div>
-        <div className="stats">
-          {s.items.map((it, i) => (
-            <div className="stat rv" key={it.label} style={{ transitionDelay: i * 80 + "ms", borderLeftColor: "rgba(255,255,255,.2)" }}>
-              <div className="stat-v"><CountUp to={it.value} prefix={it.prefix || ""} suffix={it.suffix} anim={anim} /></div>
-              <p className="stat-l" style={{ color: "#fff" }}>{it.label}</p>
-              <p className="cap" style={{ color: "rgba(255,255,255,.5)" }}>{it.note}</p>
-            </div>
-          ))}
+        <div className="didit-dia__summary">
+          <span className="didit-dia__ai">AI 요약</span>
+          <i /><i /><i className="short" />
         </div>
       </div>
-    </section>
+      <div className="didit-dia__col didit-dia__col--chat"><i /><i className="me" /><i /><i className="me" /></div>
+      <p className="didit-dia__cap">고정 영역 · <strong>가운데만 전환</strong></p>
+    </div>
+  );
+}
+
+function FeaturedCard() {
+  const F = D.projects.featured;
+  return (
+    <a className="pcard pcard--featured rv" href={F.href}>
+      <div className="pcard__media pcard__media--duo">
+        {F.shots.map((s, i) => <Pic key={s.src} src={s.src} alt={s.alt} className={`pcard__phone pcard__phone--${i}`} />)}
+      </div>
+      <div className="pcard__body">
+        <div className="pcard__tags">{F.tags.map((t) => <Tag key={t.t} kind={t.kind}>{t.t}</Tag>)}</div>
+        <h3 className="pcard__name">{F.name}</h3>
+        <p className="pcard__sub">{F.sub}</p>
+        <p className="pcard__meta">{F.meta.join(" · ")}</p>
+        <AiSplit ai={F.ai} human={F.human} />
+        <span className="pcard__cta">{F.cta} <ArrowIcon /></span>
+      </div>
+    </a>
+  );
+}
+
+function SubCard({ p, i }) {
+  const P = D.projects;
+  const [open, setOpen] = React.useState(false);
+  const regionId = `${p.id}-detail`;
+  return (
+    <article className="pcard pcard--sub rv" style={{ "--i": i }} aria-labelledby={`${p.id}-name`}>
+      <div className="pcard__media">
+        {p.video ? <LoopVideo {...p.video} className="pcard__shot pcard__shot--video" />
+          : p.visual === "didit" ? <DiditDiagram /> : <Pic src={p.image.src} alt={p.image.alt} className="pcard__shot" />}
+      </div>
+      <div className="pcard__body">
+        <div className="pcard__tags">{p.tags.map((t) => <Tag key={t.t} kind={t.kind}>{t.t}</Tag>)}</div>
+        <h3 id={`${p.id}-name`} className="pcard__name">{p.name}</h3>
+        <p className="pcard__sub">{p.sub}</p>
+        <p className="pcard__meta">{p.meta.join(" · ")}</p>
+        <AiSplit ai={p.ai} human={p.human} />
+        <button type="button" className="accordion__btn" aria-expanded={open} aria-controls={regionId} onClick={() => setOpen((v) => !v)}>
+          {open ? P.detailToggleClose : P.detailToggle}
+          <svg className="accordion__chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
+        </button>
+        <div id={regionId} className="accordion__panel" hidden={!open}>
+          {p.video && p.visual === "didit" && <div className="accordion__figure"><DiditDiagram /></div>}
+          <ol className="accordion__steps">
+            {p.detail.map((d) => (
+              <li key={d.h}><h4>{d.h}</h4><p>{d.p}</p></li>
+            ))}
+          </ol>
+          <a className="text-link" href={p.doc.href} target="_blank" rel="noopener noreferrer">{p.doc.label} <ArrowIcon dir="out" /></a>
+        </div>
+      </div>
+    </article>
   );
 }
 
 function Projects() {
-  const p = D.projects, f = p.featured;
+  const P = D.projects;
   return (
-    <section className="sec" id="projects">
-      <div className="wrap">
-        <SecHead label={p.label} title={p.title} lead={p.lead} />
-        <div className="pcase rv">
-          <div className="pcase-head">
-            <div>
-              <Badge tone="primary">{f.badge}</Badge>
-              <div className="pcase-name">{f.name}</div>
-              <p className="body" style={{ fontWeight: 500 }}>{f.sub}</p>
-            </div>
-            <div className="pmeta">{f.meta.map((m) => <span key={m}>{m}</span>)}</div>
-          </div>
-          {f.shots && (
-            <div className="pshots rv">
-              {f.shots.map((s) => (
-                <figure key={s.src}>
-                  <img src={s.src} alt={`${f.name} ${s.cap} 화면`} />
-                </figure>
-              ))}
-            </div>
-          )}
-          <div className="pcase-grid">
-            <div className="pblk">
-              <h4>{f.problem.title}</h4>
-              <p className="body">{R(f.problem.body)}</p>
-            </div>
-            <div className="pblk">
-              <h4>{f.process.title}</h4>
-              <ol className="psteps">{f.process.steps.map((s, i) => <li key={i}>{R(s)}</li>)}</ol>
-            </div>
-          </div>
-          <div className="pblk" style={{ borderTop: "none" }}>
-            <h4>{f.results.title}</h4>
-            <div className="pres">
-              {f.results.items.map((r) => (
-                <div key={r.big}>
-                  <div className="big">{r.big}</div>
-                  <p className="cap">{r.small}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="pcase-foot">
-            <p className="body">{f.learning}</p>
-          </div>
-        </div>
-        <div className="rail">
-          {p.others.map((o, i) => (
-            <div className="rv" key={o.name} style={{ transitionDelay: i * 70 + "ms", display: "flex" }}>
-              <div className="pcard">
-                <span className="tg">{o.tag}</span>
-                <span className="nm">{o.name}</span>
-                <span className="rl">{o.role}</span>
-                <p className="body" style={{ fontSize: "14px" }}>{R(o.body)}</p>
-                <div className="chips">{o.chips.map((c) => <Badge key={c} tone="neutral">{c}</Badge>)}</div>
-              </div>
-            </div>
-          ))}
+    <section id="projects" className="section" aria-labelledby="projects-title">
+      <div className="container">
+        <SectionHeader no={P.no} label={P.label} title={<span id="projects-title">{P.title}</span>} lead={P.lead} />
+        <FeaturedCard />
+        <div className="pgrid">
+          {P.others.map((p, i) => <SubCard key={p.id} p={p} i={i} />)}
         </div>
       </div>
     </section>
   );
 }
 
+/* ---------- 04 Skills ---------- */
 function Skills() {
-  const s = D.skills;
+  const S = D.skills;
   return (
-    <section className="sec" id="skills">
-      <div className="wrap">
-        <SecHead label={s.label} title={s.title} lead={s.lead} />
-        <div className="sk-grid">
-          {s.groups.map((g, i) => (
-            <div className="sk rv" key={g.title} style={{ transitionDelay: i * 70 + "ms" }}>
-              <h3>{g.title}<Badge tone={g.tone}>{String(g.items.length).padStart(2, "0")}</Badge></h3>
-              <ul>{g.items.map((it) => <li key={it}>{R(it)}</li>)}</ul>
-            </div>
+    <section id="skills" className="section section--sunken" aria-labelledby="skills-title">
+      <div className="container">
+        <SectionHeader no={S.no} label={S.label} title={<span id="skills-title">{S.title}</span>} lead={S.lead} />
+        <div className="skills">
+          {S.groups.map((g, i) => (
+            <section key={g.title} className="skills__group rv" style={{ "--i": i }} aria-labelledby={`sk-${i}`}>
+              <p className="skills__en">{g.en}</p>
+              <h3 id={`sk-${i}`} className="skills__title">{g.title}</h3>
+              <ul className="skills__list">{g.items.map((it) => <li key={it}>{it}</li>)}</ul>
+            </section>
           ))}
         </div>
-      </div>
-    </section>
-  );
-}
-
-function Perspective() {
-  const p = D.insight;
-  return (
-    <section className="sec alt" id="perspective">
-      <div className="wrap persp">
-        <div className="persp-pin rv">
-          <p className="eyebrow">{p.label}</p>
-          <h2 className="h2">{p.title}</h2>
-        </div>
-        <div>
-          <div className="essay rv">{p.essay.map((t, i) => <p key={i}>{R(t)}</p>)}</div>
-          <div className="notes">
-            {p.notes.map((n, i) => (
-              <div className="note spot rv" key={n.no} style={{ "--d": i * 80 + "ms" }}>
-                <span className="no">{n.no}</span>
-                <p className="body">{R(n.body)}</p>
-              </div>
+        <div className="certs rv">
+          <h3 className="certs__title">{S.certTitle}</h3>
+          <ul className="certs__list">
+            {S.certs.map((c) => (
+              <li key={c.t} className={`tag ${c.award ? "tag--award" : "tag--tool"}`}>{c.t}<span className="certs__note">{c.note}</span></li>
             ))}
-          </div>
+          </ul>
         </div>
       </div>
     </section>
   );
 }
 
-function Proposal() {
-  const p = D.proposal;
+/* ---------- 05 Journey ---------- */
+function Journey() {
+  const J = D.journey;
   return (
-    <section className="sec" id="proposal">
-      <div className="wrap">
-        <SecHead label={p.label} title={p.title} lead={p.lead} />
-        <div className="prop-steps">
-          {p.steps.map((s, i) => (
-            <div className="prop-step rv" key={s.no} style={{ transitionDelay: i * 70 + "ms" }}>
-              <span className="no">{s.no}</span>
-              <div>
-                <h3 className="h3" style={{ marginBottom: 14 }}>{s.title}</h3>
-                <p className="body">{R(s.body)}</p>
-              </div>
-              <p className="metric">{s.metric}</p>
-            </div>
-          ))}
-        </div>
-        {p.footnote && <p className="prop-note rv">{R(p.footnote)}</p>}
-      </div>
-    </section>
-  );
-}
-
-function Experience() {
-  const e = D.experience;
-  return (
-    <section className="sec alt" id="experience">
-      <div className="wrap">
-        <SecHead label={e.label} title={e.title} lead={e.lead} />
-        <div className="exp">
-          {e.items.map((it, i) => (
-            <div className="exp-item panel rv" key={it.org} style={{ transitionDelay: i * 70 + "ms" }}>
-              <div className="exp-side">
-                <span className="per">{it.period}</span>
-                <h3 className="org">{it.org}</h3>
-                <span className="role">{it.role}</span>
-                <div className="exp-metrics">{it.metrics.map((m) => <span key={m}>{m}</span>)}</div>
-              </div>
-              <div>
-                <div className="exp-blocks">
-                  {it.blocks.map((b) => (
-                    <div className="exp-blk" key={b.h}>
-                      <h5>{b.h}</h5>
-                      <ul>{b.items.map((x) => <li key={x}>{R(x)}</li>)}</ul>
+    <section id="journey" className="section" aria-labelledby="journey-title">
+      <div className="container">
+        <SectionHeader no={J.no} label={J.label} title={<span id="journey-title">{J.title}</span>} lead={J.lead} />
+        <ul className="journey__legend rv" aria-label="범례">
+          {J.legend.map((l) => <li key={l.k}><span className={`dot dot--${l.k}`} aria-hidden="true" />{l.v}</li>)}
+        </ul>
+        <ol className="journey rv">
+          {J.years.map((yr) => (
+            <li key={yr.y} className={`journey__year${yr.next ? " journey__year--next" : ""}`}>
+              <p className="journey__y">{yr.y}</p>
+              <ul className="journey__items">
+                {yr.items.map((it) => (
+                  <li key={it.name} className="tl-item">
+                    <span className={`dot dot--${it.t}`} aria-hidden="true" />
+                    <span className="sr-only">{J.legend.find((l) => l.k === it.t).v}: </span>
+                    <div>
+                      <p className="tl-item__name">{it.name}</p>
+                      <p className="tl-item__note">{it.note}</p>
                     </div>
-                  ))}
-                </div>
-                {it.quote && <p className="exp-quote">{it.quote}</p>}
-              </div>
-            </div>
+                  </li>
+                ))}
+              </ul>
+            </li>
           ))}
-          <div className="edu rv">
-            <span className="k">{e.education.k}</span>
-            <span className="v">{e.education.v}</span>
-            <span className="p">{e.education.p}</span>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function Awards() {
-  const a = D.awards;
-  return (
-    <section className="sec" style={{ paddingTop: 0 }}>
-      <div className="wrap">
-        <SecHead label={a.label} title={a.title} />
-        <div className="aw rv">
-          {a.items.map((it) => (
-            <div className="aw-item spot" key={it.name}>
-              <span className="yr">{it.year}</span>
-              <span className="nm">{it.name}</span>
-              <p className="cap">{it.note}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function Contact() {
-  const c = D.contact;
-  return (
-    <section className="contact" id="contact">
-      <div className="wrap">
-        <div className="rv">
-          <p className="eyebrow">{c.label}</p>
-          <h2>{c.title}</h2>
-          <p className="body">{R(c.body)}</p>
-        </div>
-        <div className="clinks rv">
-          {c.links.map((l) => (
-            <a className="clink" key={l.k} href={l.href} target={l.href.startsWith("http") ? "_blank" : undefined} rel="noreferrer">
-              <span className="k">{l.k}</span>
-              <span className="v">{l.v}</span>
-            </a>
-          ))}
-        </div>
-        <div className="foot">
-          <span>© 2026 {D.name} · {D.role}</span>
-          <span>HA JIYEON — PORTFOLIO</span>
-        </div>
+        </ol>
       </div>
     </section>
   );
 }
 
 function App() {
-  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
-  const [active, setActive] = React.useState("");
-  const [ready, setReady] = React.useState(false);
-  const [prog, setProg] = React.useState(0);
-  const [quest, setQuest] = React.useState(false);
-  const openQuest = React.useCallback(() => setQuest(true), []);
-  const closeQuest = React.useCallback(() => setQuest(false), []);
-  useKonami(openQuest);
-  useSpotlight(t.scrollAnim);
-  const sp = { compact: 0.72, regular: 1, comfy: 1.28 }[t.density] || 1;
-
-  useReveal(`${t.mood}-${t.showProposal}-${t.showPerspective}-${t.showAwards}-${t.scrollAnim}`);
-  React.useEffect(() => { const id = setTimeout(() => setReady(true), 80); return () => clearTimeout(id); }, []);
-  React.useEffect(() => {
-    const on = () => {
-      const h = document.documentElement;
-      setProg(Math.min(100, (window.scrollY / Math.max(1, h.scrollHeight - window.innerHeight)) * 100));
-      let cur = "";
-      D.nav.forEach((n) => { const el = document.getElementById(n.id); if (el && el.getBoundingClientRect().top <= 160) cur = n.id; });
-      setActive(cur);
-    };
-    on(); window.addEventListener("scroll", on, { passive: true });
-    return () => window.removeEventListener("scroll", on);
-  }, []);
-
+  useReveal();
+  useHashScroll();
   return (
-    <div className={"pf" + (ready ? " ready" : "")} data-mood={t.mood} data-anim={t.scrollAnim ? "on" : "off"}
-      style={{ "--accent": t.accent, "--accent-soft": ACCENT_SOFT[t.accent] || "#E2F4FA", "--sp": sp, "--ts": t.typeScale / 100 }}>
-      <div className="aura"><i className="a"></i><i className="b"></i><i className="c"></i></div>
-      <div className="prog" style={{ width: prog + "%" }}></div>
-      <Nav active={active} />
-      <Hero />
-      <Journey />
-      <About />
-      <Projects />
-      <Experience />
-      <Skills />
-      {t.showPerspective && <Perspective />}
-      {t.showProposal && <Proposal />}
-      {t.showAwards && <Awards />}
+    <>
+      <Gnb activeIds={D.nav.map((n) => n.id)} />
+      <main id="main">
+        <Hero />
+        <Strength />
+        <Projects />
+        <Skills />
+        <Journey />
+      </main>
       <Contact />
-      <Quest open={quest} onClose={closeQuest} />
-      <TweaksPanel>
-        <TweakSection label="무드" />
-        <TweakRadio label="톤" value={t.mood} options={["warm", "night", "paper"]} onChange={(v) => setTweak("mood", v)} />
-        <TweakColor label="포인트 컬러" value={t.accent} options={["#0AA0D2", "#0A3255"]} onChange={(v) => setTweak("accent", v)} />
-        <TweakSection label="레이아웃" />
-        <TweakRadio label="여백 밀도" value={t.density} options={["compact", "regular", "comfy"]} onChange={(v) => setTweak("density", v)} />
-        <TweakSlider label="글자 크기" value={t.typeScale} min={85} max={120} step={5} unit="%" onChange={(v) => setTweak("typeScale", v)} />
-        <TweakToggle label="스크롤 애니메이션" value={t.scrollAnim} onChange={(v) => setTweak("scrollAnim", v)} />
-        <TweakSection label="섹션" />
-        <TweakToggle label="Why HR" value={t.showPerspective} onChange={(v) => setTweak("showPerspective", v)} />
-        <TweakToggle label="업무 계획 초안" value={t.showProposal} onChange={(v) => setTweak("showProposal", v)} />
-        <TweakToggle label="수상 · 인증" value={t.showAwards} onChange={(v) => setTweak("showAwards", v)} />
-      </TweaksPanel>
-    </div>
+      <BackToTop />
+    </>
   );
 }
 

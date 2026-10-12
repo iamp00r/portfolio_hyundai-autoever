@@ -1,0 +1,43 @@
+/* =========================================================
+   Semantic tokens — 컴포넌트는 이 파일의 이름만 참조한다.
+   (DESIGN_GUIDE.md §1-3, §3-6)
+   ========================================================= */
+:root {
+  /* Surface */
+  --surface-page: #F5F5F5;
+  --surface-card: var(--sand-0);
+  --surface-sunken: var(--sand-100);
+  --surface-inverse: var(--blue-700);
+
+  /* Text */
+  --text-strong: var(--blue-700);
+  --text-body: var(--sand-700);
+  --text-muted: var(--sand-600);
+  --text-inverse: var(--sand-0);
+  --text-inverse-muted: var(--blue-200);
+
+  /* Accent */
+  --accent: var(--active-500);       /* 그래픽 전용, 텍스트 금지 */
+  --accent-ink: var(--active-ink);   /* 링크 · 오버라인 */
+  --highlight: var(--gold-ink);      /* 성과 · NEXT */
+
+  /* Line */
+  --border: var(--sand-200);
+  --border-strong: var(--sand-300);
+  --focus-ring: var(--active-500);
+  --danger: var(--red-ink);
+
+  /* Action */
+  --action-primary: var(--blue-700);
+  --action-primary-hover: var(--blue-500);
+  --action-primary-pressed: var(--blue-900);
+  --action-secondary-hover: var(--blue-50);
+  --action-secondary-pressed: var(--blue-100);
+  --action-disabled-bg: var(--sand-200);
+  --action-disabled-fg: var(--sand-500);
+
+  /* Elevation */
+  --elev-1: 0 12px 32px rgb(0 44 95 / .10);
+  --elev-glass-bg: rgb(246 243 242 / .8);
+  --elev-glass-shadow: 0 1px 0 rgb(0 44 95 / .06);
+}
